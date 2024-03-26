@@ -8,7 +8,7 @@ import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import android.os.SystemClock
-import android.provider.Settings
+// import android.provider.Settings
 import android.widget.Toast
 import java.text.SimpleDateFormat
 import java.util.*
@@ -49,25 +49,28 @@ class EndlessService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        log("The service has been created".toUpperCase())
+        log("The service has been created".uppercase(Locale.getDefault()))
         val notification = createNotification()
         startForeground(1, notification)
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        log("The service has been destroyed".toUpperCase())
+        log("The service has been destroyed".uppercase(Locale.getDefault()))
         Toast.makeText(this, "Service destroyed", Toast.LENGTH_SHORT).show()
     }
 
     override fun onTaskRemoved(rootIntent: Intent) {
         val restartServiceIntent = Intent(applicationContext, EndlessService::class.java).also {
             it.setPackage(packageName)
-        };
-        val restartServicePendingIntent: PendingIntent = PendingIntent.getService(this, 1, restartServiceIntent, PendingIntent.FLAG_ONE_SHOT);
-        applicationContext.getSystemService(Context.ALARM_SERVICE);
-        val alarmService: AlarmManager = applicationContext.getSystemService(Context.ALARM_SERVICE) as AlarmManager;
-        alarmService.set(AlarmManager.ELAPSED_REALTIME, SystemClock.elapsedRealtime() + 1000, restartServicePendingIntent);
+        }
+        // There was needed mutability flag, adding PendingIntent.FLAG_IMMUTABLE maybe it should be MUTABLE instead?
+        val restartServicePendingIntent: PendingIntent = PendingIntent.getService(this, 1,
+            restartServiceIntent,
+            PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE)
+        applicationContext.getSystemService(Context.ALARM_SERVICE)
+        val alarmService: AlarmManager = applicationContext.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        alarmService.set(AlarmManager.ELAPSED_REALTIME, SystemClock.elapsedRealtime() + 1000, restartServicePendingIntent)
     }
     
     private fun startService() {
@@ -81,7 +84,7 @@ class EndlessService : Service() {
         wakeLock =
             (getSystemService(Context.POWER_SERVICE) as PowerManager).run {
                 newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "EndlessService::lock").apply {
-                    acquire()
+                    acquire(10*60*1000L /*10 minutes, although, we probably should remove it and have indefinite*/)
                 }
             }
 
@@ -91,7 +94,7 @@ class EndlessService : Service() {
                 launch(Dispatchers.IO) {
                     pingFakeServer()
                 }
-                delay(1 * 60 * 1000)
+                delay(1 * 15 * 1000)
             }
             log("End of the loop for the service")
         }
@@ -119,8 +122,10 @@ class EndlessService : Service() {
         val df = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.mmmZ")
         val gmtTime = df.format(Date())
 
-        val deviceId = Settings.Secure.getString(applicationContext.contentResolver, Settings.Secure.ANDROID_ID)
-
+        /*
+        val deviceId = Settings.Secure.getString(applicationContext.contentResolver,
+            Settings.Secure.ANDROID_ID
+        )
         val json =
             """
                 {
@@ -128,8 +133,19 @@ class EndlessService : Service() {
                     "createdAt": "$gmtTime"
                 }
             """
+         */
+        val json =
+            """
+                {
+                    "createdAt": "$gmtTime"
+                }
+            """
+
         try {
-            Fuel.post("https://jsonplaceholder.typicode.com/posts")
+            // https://jsonplaceholder.typicode.com is a free fake API for
+            // testing and prototyping.
+            // Fuel.post("https://jsonplaceholder.typicode.com/posts")
+            Fuel.post("https://localhost/posts")
                 .jsonBody(json)
                 .response { _, _, result ->
                     val (bytes, error) = result
@@ -166,8 +182,11 @@ class EndlessService : Service() {
             notificationManager.createNotificationChannel(channel)
         }
 
-        val pendingIntent: PendingIntent = Intent(this, MainActivity::class.java).let { notificationIntent ->
-            PendingIntent.getActivity(this, 0, notificationIntent, 0)
+        // Adding IMMUTABLE, but maybe it should be MUTABLE instead?
+        val pendingIntent: PendingIntent = Intent(this,
+            MainActivity::class.java).let { notificationIntent ->
+            PendingIntent.getActivity(this, 0,
+                notificationIntent, PendingIntent.FLAG_IMMUTABLE)
         }
 
         val builder: Notification.Builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Notification.Builder(
@@ -175,9 +194,12 @@ class EndlessService : Service() {
             notificationChannelId
         ) else Notification.Builder(this)
 
+        val df = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.mmmZ")
+        val gmtTime = df.format(Date())
+
         return builder
             .setContentTitle("Endless Service")
-            .setContentText("This is your favorite endless service working")
+            .setContentText("Yay endless service working $gmtTime")
             .setContentIntent(pendingIntent)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setTicker("Ticker text")
