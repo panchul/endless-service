@@ -1,4 +1,4 @@
-package com.robertohuertas.endless
+package com.exampleapps.endless
 
 enum class Actions {
     START,

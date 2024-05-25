@@ -1,4 +1,4 @@
-package com.robertohuertas.endless
+package com.exampleapps.endless
 
 import android.content.BroadcastReceiver
 import android.content.Context

@@ -1,4 +1,4 @@
-package com.robertohuertas.endless
+package com.exampleapps.endless
 
 import android.app.*
 import android.content.Context

@@ -1,4 +1,4 @@
-package com.robertohuertas.endless
+package com.exampleapps.endless
 
 import android.content.Context
 import android.content.SharedPreferences
